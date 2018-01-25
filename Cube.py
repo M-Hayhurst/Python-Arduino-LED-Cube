@@ -10,7 +10,7 @@ class CUBE:
 		try:
 			self.open_serial()
 			print('Serial connection made. Testing connection...')
-			self.send('G')
+			self.send('G') # for some reason the first message is not read by the Arduino. Please keep this line.
 			self.send('G')
 			if self.read() == 'G':
 				print('Arduino responded correctly')
