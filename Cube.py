@@ -2,26 +2,32 @@
 import serial
 import patterngenerator
 import time
+import sys
 
-class CUBE:
+class Cube:
 
-	def __init__(self):
+	def __init__(self, port='COM3'):
+
+		self.port = port
+
 		print('Created instance of LED cube')
-		try:
-			self.open_serial()
-			print('Serial connection made. Testing connection...')
-			self.send('G') # for some reason the first message is not read by the Arduino. Please keep this line.
-			self.send('G')
-			if self.read() == 'G':
-				print('Arduino responded correctly')
-			else:
-				print('Arduino did not respond correctly')
+		self.open_serial()
+		time.sleep(0.2)
+		print('Serial connection made. Testing connection...')
+		self.send('G') # for some reason the first message is not read by the Arduino. Please keep this line.
+		self.send('G')
+		time.sleep(0.1)
 
-		except s:
-			raise(s)
+		x = self.read()
+		print(x)
 
-	def open_serial(self, port='COM3', baud=9600, timeout=0.2):
-		self.s = serial.Serial(port, baud, timeout=timeout)
+		if self.read() == b'G':
+			print('Arduino responded correctly')
+		else:
+			print('Arduino did not respond correctly')
+
+	def open_serial(self, baud=9600, timeout=0.2):
+		self.s = serial.Serial(self.port, baud, timeout=timeout)
 
 	def close_serial(self):
 		self.s.close()
@@ -35,18 +41,22 @@ class CUBE:
 	def readline(self):
 		return self.s.readline()
 
-	def send_pat_binary(self, filedir):
-		# generate binary from animation file
-		s = patterngenerator.get_pattern_as_string(filedir)
+	def send_ani_binary(self, filedir):
+		'''Read the animation in the image specified from filedir, convert to a binary string and send to the arduino.
+		'''
+		s = patterngenerator.get_animation_as_string(filedir)
 		n_frames = len(s)//27
-		s_binary = patterngenerator.stringToBinary(s)
+		s_binary = patterngenerator.string_to_binary(s)
 
 		# ensure the animation is turned off, so the Arduino always listens to the serial port
 		self.send('S')
-		while True:
+
+		for i in range(20): # use a for loop rather while to avoid an infinite wait
 			time.sleep(0.05)
 			if self.read() == b'S':
 				break
+		else:
+			exception('Arduino did not respond correctly after being instructed to stop playback')
 
 		# update number of frames
 		self.send('N%d\n'%n_frames)
@@ -64,7 +74,8 @@ class CUBE:
 		time.sleep(0.05)
 
 
-	def send_pat(self, filedir):
+	def send_ani(self, filedir):
+		'''legacy function where the animation is sent as a string of '1' and '0's instead for a bytearray'''
 		s = patterngenerator.get_pattern_as_string(filedir)
 		n_frames = len(s)//27
 
@@ -79,17 +90,25 @@ class CUBE:
 		print(self.readline()[::-2])
 
 	def set_duty(self, x):
-		self.send('D'+str(x))
-		time.sleep(0.1)
-		print(self.readline())
+		'''Set the LED duty cycle which influence brightness.
+		Must be an integer between 1 and 100'''
+		x = int(x)
+		if x>0 and x<=100:
+			self.send('D'+str(x))
+			time.sleep(0.1)
+			print(self.readline())
+		else:
+			exception('Invalid dutycycle (must be between 1 and 100)')
 
 	def set_frametime(self, x):
+		'''Set frame duration in ms'''
 		self.send('T'+str(x))
 		time.sleep(0.1)
 		print(self.readline())
 
 	def debug(self):
-		# get dubug information from arduino
+		'''Get debug information from Arduino.
+		Print relevant system varibles'''
 		self.send('H')
 
 		# wait for Arduino to go into serial mode
@@ -112,4 +131,4 @@ class CUBE:
 
 
 if __name__ == '__main__':
-	cube = CUBE()
+	cube = Cube(port=sys.argv[1])

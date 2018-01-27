@@ -13,10 +13,10 @@
 // The LED columns are pins 2 to 10 inclusive. Pin 1 is discouraged as it is a serial port.
 
 // Define global varibles
-int n_frames; // number of frames in the current animation
-byte cur_pat[MAXFRAMES*4]; // current pattern to be played. Each frame consumes 4 bytes 
-bool run = true; // animation only runs if true. Can be set to zero to enable serial com without loss
-int cur_frame = 0; // number of current frame
+int NFRAMES; // number of frames in the current animation
+byte CURANI[MAXFRAMES*4]; // Animation buffer. Each frame consumes 4 bytes 
+bool RUN = true; // animation only runs if true. Can be set to zero to enable serial com without loss
+int cur_frame = 0; // number of frames in the current animation
 
 int FRAMEDURATION = 200; // appriximate duration of frame in ms
 int LEVELDURATION = 1; // duration of single level in ms
@@ -45,12 +45,12 @@ void setup() {
 }
 
 void load_default_pattern(){
-  n_frames = default_n_frames;
+  NFRAMES = default_n_frames;
   for (int n=0; n<default_n_frames; n++) // loop over frames
   {
     for (int i=0; i<27; i++) // loop over the 27 bools in the frame
     {
-      bitWrite(cur_pat[n*4+i/8], i%8, default_pat[n*27+i]);
+      bitWrite(CURANI[n*4+i/8], i%8, default_pat[n*27+i]);
     }
   }
     
@@ -58,12 +58,12 @@ void load_default_pattern(){
 
 void update_timings(){
   // calculate the delay after showing a frame and the number of blinks in order to achieve a given dutycycle and a given frame duration
-  DARKTIME = round(3*LEVELDURATION*(100/DUTYCYCLE - 1));
-  FRAMEREPS = ceil(FRAMEDURATION/(3*LEVELDURATION + DARKTIME)); 
+  DARKTIME = round(3*LEVELDURATION*(100/DUTYCYCLE - 1)); 
+  FRAMEREPS = ceil(FRAMEDURATION/(3*LEVELDURATION + DARKTIME)); // how many times a frame is repeated
 }
 
 void turnoff_levels(){
-  // turn the requested level on and the others off. Zero indexed
+  // turn the requested level on and the others off
   digitalWrite(L1, LOW);
   digitalWrite(L2, LOW);
   digitalWrite(L3, LOW);
@@ -90,30 +90,30 @@ void show_frame(byte *pat){
 
 // the loop function runs over and over again forever
 void loop() {
-  if(run){
+  if(RUN){
     for (int i=0; i<FRAMEREPS; i++)
     {
-      show_frame(cur_pat+4*cur_frame);
+      show_frame(CURANI+4*cur_frame);
     }
-    cur_frame = (cur_frame+1)%n_frames;
+    cur_frame = (cur_frame+1)%NFRAMES;
   }
 }
 
 void serialEvent(){
     while (Serial.available()){
       char c = Serial.read(); // read the first char of the buffer
-      Serial.write(c);
+      Serial.write(c); // send the command back to the PC
 
       switch (c) {
         case 'G': // confirm connection, just return the same character
           break;
 
         case 'S': // stop animation
-          run = false;
+          RUN = false;
           break;
 
         case 'R': // resume animation
-          run = true;
+          RUN = true;
           break;
 
         case 'N': // set number of frames
@@ -122,7 +122,7 @@ void serialEvent(){
           n = Serial.readStringUntil('\n').toInt();
           Serial.println(n);
           if (n>0 && n<=MAXFRAMES){ // ensure n can never be so large, that a new pattern overwrites the pattern array.
-            n_frames = n;
+            NFRAMES = n;
           }
           break;
         }
@@ -157,7 +157,7 @@ void serialEvent(){
         
         case 'P': //receive pattern
         {
-          Serial.readBytes(cur_pat, n_frames*4);
+          Serial.readBytes(CURANI, NFRAMES*4);
           char c = Serial.read();
           if (c == '\n')
           {
@@ -172,7 +172,7 @@ void serialEvent(){
         case 'H': //Help! Print varibles
         {
           Serial.println("nFrames");
-          Serial.println(n_frames);
+          Serial.println(NFRAMES);
 
           Serial.println("FRAMEDURATION");
           Serial.println(FRAMEDURATION);
@@ -189,8 +189,8 @@ void serialEvent(){
           Serial.println("FRAMEREPS");
           Serial.println(FRAMEREPS);
           
-          Serial.println("run");
-          Serial.println(run);
+          Serial.println("RUN");
+          Serial.println(RUN);
           
           Serial.println("cur_frame");
           Serial.println(cur_frame);
